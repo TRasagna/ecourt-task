@@ -46,3 +46,5 @@ output/logs/*.log
 !output/json/.gitkeep
 !output/pdfs/.gitkeep
 !output/logs/.gitkeep
+
+.venv/

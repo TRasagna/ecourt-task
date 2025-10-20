@@ -272,45 +272,37 @@ class eCourtsScraper:
 
             # Navigate to cause list page
             self.page.goto(config.ECOURTS_CAUSELIST_URL)
-            time.sleep(2)
+            self.page.click("text=Cause List") # Click the cause list button again
 
             # Select state
-            state_select = self.page.wait_for_selector("select[name*='state' i], select[id*='state' i]", timeout=10000)
-            if state_select:
-                state_select.select_option(label=state)
-                time.sleep(1)
+            state_value = self.page.select_option("select[name='sess_state_code']", label=state)[0]
+            self.page.evaluate(f"fillDistrict({state_value})")
+            self.page.wait_for_load_state('networkidle')
 
             # Select district
-            district_select = self.page.wait_for_selector("select[name*='district' i], select[id*='district' i]", timeout=10000)
-            if district_select:
-                district_select.select_option(label=district)
-                time.sleep(1)
+            district_value = self.page.select_option("select[name='sees_dist_code']", label=district)[0]
+            self.page.evaluate(f"fillCourtComplex({district_value})")
+            self.page.wait_for_load_state('networkidle')
 
             # Select court complex
-            complex_select = self.page.wait_for_selector("select[name*='complex' i], select[id*='complex' i]", timeout=10000)
-            if complex_select:
-                complex_select.select_option(label=court_complex)
-                time.sleep(1)
+            self.page.select_option("select[id='court_complex_code']", label=court_complex)
+            self.page.dispatch_event("select[id='court_complex_code']", 'change')
+            try:
+                self.page.wait_for_function("() => document.getElementById('CL_court_no').options.length > 1", timeout=config.WAIT_TIMEOUT)
+            except PlaywrightTimeout:
+                self.logger.error("Court name dropdown not populated. Taking a screenshot.")
+                self.page.screenshot(path="court_name_dropdown_not_populated.png")
+                return None
 
             # Select court name if provided
             if court_name:
-                court_select = self.page.wait_for_selector("select[name*='court' i], select[id*='court_name' i]", timeout=10000)
-                if court_select:
-                    court_select.select_option(label=court_name)
-                    time.sleep(1)
+                self.page.select_option("select[name='CL_court_no']", label=court_name)
             else:
                 # Select first available court
-                court_select = self.page.wait_for_selector("select[name*='court' i], select[id*='court_name' i]", timeout=10000)
-                if court_select:
-                    options = court_select.query_selector_all("option")
-                    if len(options) > 1:
-                        options[1].click()
-                        time.sleep(1)
+                self.page.query_selector("#CL_court_no option:nth-child(2)").click()
 
             # Fill date
-            date_input = self.page.query_selector("input[type='text'][name*='date' i], input[id*='date' i]")
-            if date_input:
-                date_input.fill(date)
+            self.page.fill("#causelist_date", date)
 
             # Solve CAPTCHA
             if not self._solve_captcha_with_retry():
@@ -319,9 +311,9 @@ class eCourtsScraper:
 
             # Click appropriate button (Civil/Criminal)
             if list_type.lower() == "civil":
-                submit_btn = self.page.query_selector("input[value*='Civil' i], button:has-text('Civil')")
+                submit_btn = self.page.query_selector("button:has-text('Civil')")
             else:
-                submit_btn = self.page.query_selector("input[value*='Criminal' i], button:has-text('Criminal')")
+                submit_btn = self.page.query_selector("button:has-text('Criminal')")
 
             if submit_btn:
                 # Setup download handler
@@ -352,6 +344,7 @@ class eCourtsScraper:
 
         except Exception as e:
             self.logger.error(f"Error downloading cause list: {e}")
+            self.page.screenshot(path="error_downloading_cause_list.png")
             return None
 
     def _extract_cause_list_from_page(self, state: str, district: str, court_complex: str, 
