@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>eCourts Scraper</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .tab {
+            padding: 15px 30px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+            color: #666;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-right: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .result.show {
+            display: block;
+        }
+
+        .result h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .result pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+
+        .error {
+            color: #dc3545;
+            padding: 15px;
+            background: #f8d7da;
+            border-radius: 5px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .success {
+            color: #28a745;
+            padding: 15px;
+            background: #d4edda;
+            border-radius: 5px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .success.show {
+            display: block;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚖️ eCourts Scraper</h1>
+            <p>Search court cases and download cause lists</p>
+        </div>
+
+        <div class="card">
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('cnr')">CNR Search</button>
+                <button class="tab" onclick="switchTab('causelist')">Cause List</button>
+            </div>
+
+            <!-- CNR Search Tab -->
+            <div id="cnr-tab" class="tab-content active">
+                <form id="cnr-form">
+                    <div class="form-group">
+                        <label for="cnr">CNR Number:</label>
+                        <input type="text" id="cnr" name="cnr" placeholder="e.g., KARC010037582023" required>
+                    </div>
+
+                    <button type="submit" class="btn">Search Case</button>
+                    <button type="button" class="btn" onclick="checkToday()">Check Today</button>
+                    <button type="button" class="btn" onclick="checkTomorrow()">Check Tomorrow</button>
+                </form>
+
+                <div id="cnr-loading" class="loading">
+                    <div class="spinner"></div>
+                    <p>Searching...</p>
+                </div>
+
+                <div id="cnr-error" class="error"></div>
+                <div id="cnr-result" class="result"></div>
+            </div>
+
+            <!-- Cause List Tab -->
+            <div id="causelist-tab" class="tab-content">
+                <form id="causelist-form">
+                    <div class="form-group">
+                        <label for="state">State:</label>
+                        <select id="state" name="state" required>
+                            <option value="">Select State</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="district">District:</label>
+                        <input type="text" id="district" name="district" placeholder="e.g., Bangalore" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="court_complex">Court Complex:</label>
+                        <input type="text" id="court_complex" name="court_complex" placeholder="e.g., City Civil Court" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="court_name">Court Name (Optional):</label>
+                        <input type="text" id="court_name" name="court_name" placeholder="Leave empty to select first available">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="date">Date (DD-MM-YYYY):</label>
+                        <input type="text" id="date" name="date" placeholder="Leave empty for today">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="list_type">List Type:</label>
+                        <select id="list_type" name="list_type">
+                            <option value="Civil">Civil</option>
+                            <option value="Criminal">Criminal</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn">Download Cause List</button>
+                </form>
+
+                <div id="causelist-loading" class="loading">
+                    <div class="spinner"></div>
+                    <p>Downloading cause list...</p>
+                </div>
+
+                <div id="causelist-error" class="error"></div>
+                <div id="causelist-success" class="success"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-tab').classList.add('active');
+        }
+
+        // Load states
+        fetch('/get_states')
+            .then(res => res.json())
+            .then(states => {
+                const select = document.getElementById('state');
+                states.forEach(state => {
+                    const option = document.createElement('option');
+                    option.value = state;
+                    option.textContent = state;
+                    select.appendChild(option);
+                });
+            });
+
+        // CNR Search Form
+        document.getElementById('cnr-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const cnr = document.getElementById('cnr').value;
+            await searchCNR(cnr);
+        });
+
+        async function searchCNR(cnr) {
+            const loading = document.getElementById('cnr-loading');
+            const error = document.getElementById('cnr-error');
+            const result = document.getElementById('cnr-result');
+
+            loading.classList.add('show');
+            error.classList.remove('show');
+            result.classList.remove('show');
+
+            try {
+                const response = await fetch('/search_cnr', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({cnr})
+                });
+
+                loading.classList.remove('show');
+
+                if (response.ok) {
+                    const data = await response.json();
+                    result.innerHTML = '<h3>Case Information:</h3><pre>' + 
+                                      JSON.stringify(data.data, null, 2) + '</pre>';
+                    result.classList.add('show');
+                } else {
+                    const err = await response.json();
+                    error.textContent = err.error || 'An error occurred';
+                    error.classList.add('show');
+                }
+            } catch (err) {
+                loading.classList.remove('show');
+                error.textContent = 'Network error: ' + err.message;
+                error.classList.add('show');
+            }
+        }
+
+        async function checkToday() {
+            const cnr = document.getElementById('cnr').value;
+            if (!cnr) {
+                alert('Please enter CNR number');
+                return;
+            }
+            await checkListing(cnr, 'today');
+        }
+
+        async function checkTomorrow() {
+            const cnr = document.getElementById('cnr').value;
+            if (!cnr) {
+                alert('Please enter CNR number');
+                return;
+            }
+            await checkListing(cnr, 'tomorrow');
+        }
+
+        async function checkListing(cnr, type) {
+            const loading = document.getElementById('cnr-loading');
+            const error = document.getElementById('cnr-error');
+            const result = document.getElementById('cnr-result');
+
+            loading.classList.add('show');
+            error.classList.remove('show');
+            result.classList.remove('show');
+
+            try {
+                const response = await fetch('/check_listing', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({cnr, type})
+                });
+
+                loading.classList.remove('show');
+
+                if (response.ok) {
+                    const data = await response.json();
+                    result.innerHTML = '<h3>Listing Check (' + type + '):</h3><pre>' + 
+                                      JSON.stringify(data.data, null, 2) + '</pre>';
+                    result.classList.add('show');
+                } else {
+                    const err = await response.json();
+                    error.textContent = err.error || 'An error occurred';
+                    error.classList.add('show');
+                }
+            } catch (err) {
+                loading.classList.remove('show');
+                error.textContent = 'Network error: ' + err.message;
+                error.classList.add('show');
+            }
+        }
+
+        // Cause List Form
+        document.getElementById('causelist-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const loading = document.getElementById('causelist-loading');
+            const error = document.getElementById('causelist-error');
+            const success = document.getElementById('causelist-success');
+
+            loading.classList.add('show');
+            error.classList.remove('show');
+            success.classList.remove('show');
+
+            const formData = {
+                state: document.getElementById('state').value,
+                district: document.getElementById('district').value,
+                court_complex: document.getElementById('court_complex').value,
+                court_name: document.getElementById('court_name').value || null,
+                date: document.getElementById('date').value || null,
+                list_type: document.getElementById('list_type').value
+            };
+
+            try {
+                const response = await fetch('/download_causelist', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(formData)
+                });
+
+                loading.classList.remove('show');
+
+                if (response.ok) {
+                    const data = await response.json();
+                    success.textContent = data.message + '\nFile: ' + data.file;
+                    success.classList.add('show');
+                } else {
+                    const err = await response.json();
+                    error.textContent = err.error || 'An error occurred';
+                    error.classList.add('show');
+                }
+            } catch (err) {
+                loading.classList.remove('show');
+                error.textContent = 'Network error: ' + err.message;
+                error.classList.add('show');
+            }
+        });
+    </script>
+</body>
+</html>
